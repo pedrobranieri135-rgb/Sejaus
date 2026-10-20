@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seja US — Roupas fitness masculinas e femininas</title>
+  <meta name="description" content="US Adapt e US Essential: camisetas de performance com toque gelado e conjuntos fitness femininos. Compre online com Pix, cartão ou WhatsApp.">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,700;1,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#loja">Pular para os produtos</a>
+
+  <div class="promo-bar" role="note">
+    <p>Frete grátis acima de R$ 299 <span aria-hidden="true">/</span> 10% off na primeira compra com o cupom <b>BEMVINDOUS</b></p>
+  </div>
+
+  <header class="site-header" id="topo">
+    <div class="wrap header-inner">
+      <a href="#topo" class="brand" aria-label="Seja US — início">
+        <svg class="logo" viewBox="0 0 120 32" aria-hidden="true"><use href="#logo-us"/></svg>
+      </a>
+      <nav class="main-nav" aria-label="Principal">
+        <a href="#loja" data-line-link="adapt">Adapt <small>masculino</small></a>
+        <a href="#loja" data-line-link="essential">Essential <small>feminino</small></a>
+        <a href="#lookbook">Lookbook</a>
+        <a href="#rastreio">Meu pedido</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-btn" id="open-search" aria-label="Buscar produtos">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+        </button>
+        <button class="icon-btn" id="open-favs" aria-label="Favoritos">
+          <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>
+          <span class="badge" id="fav-count" hidden>0</span>
+        </button>
+        <button class="icon-btn cart-btn" id="open-cart" aria-label="Abrir sacola">
+          <svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>
+          <span class="badge" id="cart-count" hidden>0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO: comparador Adapt × Essential -->
+    <section class="hero" aria-label="Coleções US Adapt e US Essential">
+      <div class="split" id="split" style="--pos: 50%">
+        <div class="split-side side-adapt">
+          <img src="/img/site/hero-adapt.webp" alt="Homem com a camiseta US Adapt azul-marinho na academia" fetchpriority="high">
+          <div class="side-copy">
+            <p class="line-name">US Adapt</p>
+            <h1>Liberdade para cada movimento.</h1>
+            <p class="side-sub">Camiseta com toque gelado, anti-odor e proteção UV. 5 cores, 3 estampas.</p>
+            <a href="#loja" class="btn btn-light" data-line-link="adapt">Ver camisetas</a>
+          </div>
+        </div>
+        <div class="split-side side-essential">
+          <img src="/img/site/hero-essential.webp" alt="Mulher com o macacão seamless café da coleção Essential">
+          <div class="side-copy">
+            <p class="line-name essential-word">Essential</p>
+            <h2>First Chapter.</h2>
+            <p class="side-sub">Conjuntos, macaquinhos e tops pensados para treinar e viver.</p>
+            <a href="#loja" class="btn btn-dark" data-line-link="essential">Ver coleção</a>
+          </div>
+        </div>
+        <input type="range" class="split-range" id="split-range" min="8" max="92" value="50" aria-label="Comparar as coleções Adapt e Essential (use as setas)">
+        <div class="split-handle" id="split-handle" aria-hidden="true">
+          <span class="handle-line"></span>
+          <span class="handle-hit"></span>
+          <span class="handle-knob"><svg viewBox="0 0 48 32"><use href="#mark-us"/></svg></span>
+        </div>
+      </div>
+      <p class="hero-hint" aria-hidden="true">Arraste o símbolo para alternar entre ele e ela</p>
+    </section>
+
+    <!-- TECNOLOGIA DO TECIDO -->
+    <section class="tech" aria-labelledby="tech-title">
+      <div class="wrap tech-inner">
+        <div class="tech-head">
+          <h2 id="tech-title">O tecido trabalha enquanto você treina.</h2>
+          <p>90% poliamida e 10% elastano. Leve no corpo, firme no movimento.</p>
+        </div>
+        <ul class="tech-list">
+          <li class="tech-item" data-tech="cold">
+            <svg viewBox="0 0 40 40"><path d="M20 4v32M6 12l28 16M34 12 6 28M15 6l5 4 5-4M15 34l5-4 5 4"/></svg>
+            <h3>Toque gelado</h3><p>Conforto térmico em qualquer momento do treino.</p>
+          </li>
+          <li class="tech-item" data-tech="odor">
+            <svg viewBox="0 0 40 40"><path d="M12 32c-4-5 4-9 0-14s4-9 0-14M20 32c-4-5 4-9 0-14s4-9 0-14M28 32c-4-5 4-9 0-14s4-9 0-14"/></svg>
+            <h3>Anti-odor</h3><p>Mais frescor por mais tempo, do aquecimento ao pós.</p>
+          </li>
+          <li class="tech-item" data-tech="stretch">
+            <svg viewBox="0 0 40 40"><path d="M4 20h32M10 14l-6 6 6 6M30 14l6 6-6 6"/><circle cx="20" cy="20" r="14"/></svg>
+            <h3>Alta elasticidade</h3><p>Acompanha o seu movimento sem marcar nem prender.</p>
+          </li>
+          <li class="tech-item" data-tech="uv">
+            <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="7"/><path d="M20 3v6M20 31v6M3 20h6M31 20h6M8 8l4 4M28 28l4 4M8 32l4-4M28 12l4-4"/></svg>
+            <h3>Proteção UV</h3><p>Mais segurança para o seu dia a dia ao ar livre.</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- LOJA -->
+    <section class="shop" id="loja" aria-labelledby="shop-title">
+      <div class="wrap">
+        <div class="shop-head">
+          <h2 id="shop-title">Loja</h2>
+          <div class="line-tabs" role="tablist" aria-label="Coleção">
+            <button role="tab" data-line="" aria-selected="true">Tudo</button>
+            <button role="tab" data-line="adapt" aria-selected="false">Adapt</button>
+            <button role="tab" data-line="essential" aria-selected="false">Essential</button>
+            <span class="tab-ink" aria-hidden="true"></span>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <label class="search-field">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+            <input type="search" id="search" placeholder="Buscar: legging, flare, preta…" autocomplete="off" maxlength="60">
+          </label>
+          <div class="chips" id="category-chips" aria-label="Categorias"></div>
+          <div class="toolbar-right">
+            <label class="select">
+              <span class="sr-only">Tamanho</span>
+              <select id="size-filter"><option value="">Todos os tamanhos</option></select>
+            </label>
+            <label class="select">
+              <span class="sr-only">Ordenar</span>
+              <select id="sort">
+                <option value="">Destaques</option>
+                <option value="price_asc">Menor preço</option>
+                <option value="price_desc">Maior preço</option>
+                <option value="name">Nome (A–Z)</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <p class="result-count" id="result-count" aria-live="polite"></p>
+        <div class="grid" id="grid" aria-busy="true"></div>
+      </div>
+    </section>
+
+    <!-- LOOKBOOK -->
+    <section class="lookbook" id="lookbook" aria-labelledby="look-title">
+      <div class="wrap look-inner">
+        <div class="look-copy">
+          <h2 id="look-title"><span class="us-word">US</span> <span class="essential-word">Essential</span></h2>
+          <p class="look-script">First Chapter</p>
+          <p>Peças que saem do treino direto para a rua. Escolha a peça, a gente te ajuda com o tamanho e a cor pelo WhatsApp.</p>
+          <a href="#loja" class="btn btn-dark" data-line-link="essential">Comprar Essential</a>
+        </div>
+        <div class="collage" aria-hidden="true">
+          <figure class="frame f1"><img src="/img/site/look-tennis-s.webp" alt="" loading="lazy"></figure>
+          <figure class="frame f2"><img src="/img/site/look-flare-s.webp" alt="" loading="lazy"></figure>
+          <figure class="frame f3"><img src="/img/site/look-decote-s.webp" alt="" loading="lazy"></figure>
+          <figure class="frame f4"><img src="/img/site/look-bolso-s.webp" alt="" loading="lazy"></figure>
+        </div>
+      </div>
+      <svg class="watermark" viewBox="0 0 48 32" aria-hidden="true"><use href="#mark-us"/></svg>
+    </section>
+
+    <!-- ADAPT BANNER -->
+    <section class="adapt-band" aria-labelledby="adapt-title">
+      <div class="wrap adapt-inner">
+        <figure class="adapt-photo"><img src="/img/site/adapt-vinho-s.webp" alt="Camiseta US Adapt vinho" loading="lazy"></figure>
+        <div class="adapt-copy">
+          <h2 id="adapt-title">US <span>Adapt</span></h2>
+          <p>Modelagem masculina, do P ao XGG. Escolha entre branca, preta, vinho, cinza e azul-marinho.</p>
+          <dl class="sizes-line">
+            <dt>Tamanhos</dt>
+            <dd><span>P</span><span>M</span><span>G</span><span>GG</span><span>XGG</span></dd>
+          </dl>
+          <div class="adapt-actions">
+            <a href="#loja" class="btn btn-light" data-line-link="adapt">Comprar Adapt</a>
+            <button class="btn btn-ghost-light" data-size-guide="adapt">Tabela de medidas</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RASTREIO + NEWSLETTER -->
+    <section class="service" id="rastreio">
+      <div class="wrap service-inner">
+        <form class="track-card" id="track-form" novalidate>
+          <h2>Acompanhe seu pedido</h2>
+          <p>Use o código que aparece na confirmação (ex.: US-7K3P9Q) e o e-mail da compra.</p>
+          <div class="field-row">
+            <label class="field"><span>Código do pedido</span><input name="code" required placeholder="US-XXXXXX" autocomplete="off" maxlength="9"></label>
+            <label class="field"><span>E-mail</span><input name="email" type="email" required autocomplete="email"></label>
+          </div>
+          <button class="btn btn-dark" type="submit">Ver status</button>
+          <div class="track-result" id="track-result" aria-live="polite"></div>
+        </form>
+        <form class="news-card" id="news-form" novalidate>
+          <h2>Lançamentos primeiro para você</h2>
+          <p>Receba os novos capítulos da US antes de todo mundo. Sem spam.</p>
+          <div class="inline-form">
+            <label class="sr-only" for="news-email">E-mail</label>
+            <input id="news-email" name="email" type="email" placeholder="seu@email.com" required autocomplete="email">
+            <button class="btn btn-light" type="submit">Quero receber</button>
+          </div>
+          <p class="form-msg" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <div>
+        <svg class="logo logo-light" viewBox="0 0 120 32" aria-hidden="true"><use href="#logo-us"/></svg>
+        <p>Performance em movimento. Mais que vestir, pertencer.</p>
+      </div>
+      <div class="footer-links">
+        <a href="https://www.instagram.com/seja_us" target="_blank" rel="noopener">Instagram @seja_us</a>
+        <a href="#" data-whatsapp target="_blank" rel="noopener">WhatsApp</a>
+        <a href="#rastreio">Rastrear pedido</a>
+        <button type="button" class="linklike" data-size-guide="adapt">Tabela de medidas</button>
+      </div>
+      <p class="footer-legal">Pagamentos via Pix, cartão (link seguro) ou combinação pelo WhatsApp. Trocas em até 7 dias após o recebimento.</p>
+    </div>
+  </footer>
+
+  <a class="wa-float" href="#" data-whatsapp target="_blank" rel="noopener" aria-label="Falar com a US no WhatsApp">
+    <svg viewBox="0 0 32 32"><path d="M16 3a13 13 0 0 0-11.2 19.6L3 29l6.6-1.7A13 13 0 1 0 16 3zm0 23.6a10.6 10.6 0 0 1-5.4-1.5l-.4-.2-3.9 1 1-3.8-.2-.4A10.6 10.6 0 1 1 16 26.6zm5.8-7.9c-.3-.2-1.9-.9-2.2-1s-.5-.2-.7.2-.8 1-1 1.2-.4.2-.7 0a8.7 8.7 0 0 1-4.3-3.7c-.3-.6.3-.5.9-1.7.1-.2 0-.4 0-.5l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7 6.3 6.3 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .9 2.8.9 3.9.8a3.3 3.3 0 0 0 2.1-1.5 2.7 2.7 0 0 0 .2-1.5c-.1-.2-.3-.3-.6-.4z"/></svg>
+  </a>
+
+  <!-- MODAL PRODUTO -->
+  <dialog class="modal product-modal" id="product-modal" aria-labelledby="pm-title">
+    <div class="modal-body" id="product-modal-body"></div>
+  </dialog>
+
+  <!-- MODAL TABELA DE MEDIDAS -->
+  <dialog class="modal small-modal" id="size-modal" aria-labelledby="sg-title">
+    <div class="modal-body" id="size-modal-body"></div>
+  </dialog>
+
+  <!-- MODAL BUSCA / FAVORITOS -->
+  <dialog class="modal small-modal" id="favs-modal" aria-labelledby="fav-title">
+    <div class="modal-body" id="favs-modal-body"></div>
+  </dialog>
+
+  <!-- SACOLA -->
+  <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+  <aside class="drawer" id="cart-drawer" aria-labelledby="cart-title" aria-hidden="true" inert>
+    <header class="drawer-head">
+      <h2 id="cart-title">Sua sacola</h2>
+      <button class="icon-btn" data-close-drawer aria-label="Fechar sacola"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="free-ship" id="free-ship"></div>
+    <div class="drawer-content" id="cart-lines"></div>
+    <footer class="drawer-foot" id="cart-foot"></footer>
+  </aside>
+
+  <!-- CHECKOUT -->
+  <dialog class="modal checkout-modal" id="checkout-modal" aria-labelledby="co-title">
+    <div class="modal-body" id="checkout-body"></div>
+  </dialog>
+
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- SÍMBOLOS -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="mark-us" viewBox="0 0 48 32">
+        <path d="M24 20c-3.6-4.4-6.4-7-10-7a6.5 6.5 0 1 0 0 13c3.6 0 6.4-2.6 10-7s6.4-7 10-7a6.5 6.5 0 1 1 0 13c-3.6 0-6.4-2.6-10-6" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"/>
+        <circle cx="12.5" cy="5.2" r="3.4" fill="currentColor"/>
+        <circle cx="35.5" cy="5.2" r="3.4" fill="currentColor"/>
+      </symbol>
+      <symbol id="logo-us" viewBox="0 0 120 32">
+        <path d="M4 5v13.5c0 4.6 2.4 7.5 7.5 7.5h6c5.1 0 7.5-2.9 7.5-7.5V5" fill="none" stroke="currentColor" stroke-width="5.4"/>
+        <path d="M56 7.7H40.5c-3.2 0-4.8 1.5-4.8 4s1.6 3.9 4.8 3.9h6.8c3.4 0 5.4 1.7 5.4 4.6s-2 4.6-5.4 4.6H31.5" fill="none" stroke="currentColor" stroke-width="5.4" transform="translate(0 -.4)"/>
+        <path d="M66 3v26" stroke="currentColor" stroke-width="1.4"/>
+        <use href="#mark-us" x="74" y="0" width="44" height="30"/>
+      </symbol>
+    </defs>
+  </svg>
+</body>
+</html>

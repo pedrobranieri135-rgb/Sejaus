@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Painel — Seja US</title>
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script type="module" src="/js/admin/main.js"></script>
+</head>
+<body class="admin">
+  <!-- LOGIN -->
+  <main class="login-screen" id="login-screen" hidden>
+    <form class="login-card" id="login-form" novalidate>
+      <svg class="logo" viewBox="0 0 120 32" aria-hidden="true"><use href="#logo-us"/></svg>
+      <h1>Painel da loja</h1>
+      <label class="field"><span>E-mail</span><input type="email" name="email" required autocomplete="username"></label>
+      <label class="field"><span>Senha</span><input type="password" name="password" required autocomplete="current-password"></label>
+      <p class="form-error" id="login-error" hidden></p>
+      <button class="btn btn-dark btn-block" type="submit">Entrar</button>
+      <a class="muted back-store" href="/">Voltar para a loja</a>
+    </form>
+  </main>
+
+  <!-- APP -->
+  <div class="app" id="app" hidden>
+    <aside class="sidebar" id="sidebar">
+      <a class="side-brand" href="#/painel" aria-label="Painel">
+        <svg class="logo logo-light" viewBox="0 0 120 32" aria-hidden="true"><use href="#logo-us"/></svg>
+      </a>
+      <nav class="side-nav" aria-label="Seções do painel">
+        <a href="#/painel" data-nav="painel"><svg viewBox="0 0 24 24"><path d="M4 13h7V4H4zM13 20h7v-9h-7zM13 4v5h7V4zM4 20h7v-5H4z"/></svg>Painel</a>
+        <a href="#/pedidos" data-nav="pedidos"><svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>Pedidos <span class="nav-badge" id="nav-orders" hidden></span></a>
+        <a href="#/produtos" data-nav="produtos"><svg viewBox="0 0 24 24"><path d="M8 4 4 7l2 4 2-1v10h8V10l2 1 2-4-4-3c-.5 1.6-2 2.5-4 2.5S8.5 5.6 8 4z"/></svg>Produtos</a>
+        <a href="#/estoque" data-nav="estoque"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10"/></svg>Estoque <span class="nav-badge warn" id="nav-stock" hidden></span></a>
+        <a href="#/cupons" data-nav="cupons"><svg viewBox="0 0 24 24"><path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z"/><path d="M10 7v10" stroke-dasharray="2 2"/></svg>Cupons</a>
+        <a href="#/clientes" data-nav="clientes"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c.5-3.5 3-5.5 6-5.5s5.5 2 6 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c1.8.6 3 2.5 3.3 5.5"/></svg>Clientes</a>
+        <a href="#/relatorios" data-nav="relatorios"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Relatórios</a>
+        <a href="#/config" data-nav="config"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>Configurações</a>
+      </nav>
+      <div class="side-foot">
+        <a href="/" target="_blank" rel="noopener" class="side-store">Ver loja</a>
+        <div class="side-user"><b id="user-name"></b><span id="user-email"></span></div>
+        <button class="btn btn-ghost-light btn-sm" id="logout" type="button">Sair</button>
+      </div>
+    </aside>
+    <div class="main-wrap">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="menu-btn" aria-label="Abrir menu" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <h1 id="view-title">Painel</h1>
+        <div class="topbar-actions" id="view-actions"></div>
+      </header>
+      <main class="view" id="view" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <!-- painel lateral (detalhes de pedido, formulários) -->
+  <div class="drawer-backdrop" id="panel-backdrop" hidden></div>
+  <aside class="side-panel" id="side-panel" aria-hidden="true" inert>
+    <div class="side-panel-body" id="side-panel-body"></div>
+  </aside>
+
+  <dialog class="modal small-modal admin-modal" id="admin-modal"><div class="modal-body" id="admin-modal-body"></div></dialog>
+
+  <div class="print-area" id="print-area"></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="mark-us" viewBox="0 0 48 32">
+        <path d="M24 20c-3.6-4.4-6.4-7-10-7a6.5 6.5 0 1 0 0 13c3.6 0 6.4-2.6 10-7s6.4-7 10-7a6.5 6.5 0 1 1 0 13c-3.6 0-6.4-2.6-10-6" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"/>
+        <circle cx="12.5" cy="5.2" r="3.4" fill="currentColor"/><circle cx="35.5" cy="5.2" r="3.4" fill="currentColor"/>
+      </symbol>
+      <symbol id="logo-us" viewBox="0 0 120 32">
+        <path d="M4 5v13.5c0 4.6 2.4 7.5 7.5 7.5h6c5.1 0 7.5-2.9 7.5-7.5V5" fill="none" stroke="currentColor" stroke-width="5.4"/>
+        <path d="M56 7.7H40.5c-3.2 0-4.8 1.5-4.8 4s1.6 3.9 4.8 3.9h6.8c3.4 0 5.4 1.7 5.4 4.6s-2 4.6-5.4 4.6H31.5" fill="none" stroke="currentColor" stroke-width="5.4" transform="translate(0 -.4)"/>
+        <path d="M66 3v26" stroke="currentColor" stroke-width="1.4"/>
+        <use href="#mark-us" x="74" y="0" width="44" height="30"/>
+      </symbol>
+    </defs>
+  </svg>
+</body>
+</html>
