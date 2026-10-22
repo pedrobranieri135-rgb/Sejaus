@@ -13,7 +13,7 @@ function loadSdk() {
     s.src = SDK_URL;
     s.async = true;
     s.onload = () => (window.MercadoPago ? resolve(window.MercadoPago) : reject(new Error("SDK indisponível")));
-    s.onerror = () => { sdkPromise = null; reject(new Error("Não foi possível carregar o pagamento com cartão. Verifique sua conexão.")); };
+    s.onerror = () => { sdkPromise = null; reject(new Error("O pagamento com cartão não carregou. Se você usa bloqueador de anúncios, desative-o para este site e recarregue a página, ou escolha Pix.")); };
     document.head.append(s);
   });
   return sdkPromise;
