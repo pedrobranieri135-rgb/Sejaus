@@ -359,6 +359,8 @@ async function submit(card) {
 export async function openCheckout() {
   if (!state.cart.length) return toast("Sua sacola está vazia", { type: "bad" });
   closeCart();
+  // reconsulta a configuração: se o pagamento online foi ligado/desligado com a página aberta, o checkout acompanha
+  try { state.meta = { ...state.meta, ...(await api("/meta")) }; } catch { /* segue com a configuração já carregada */ }
   co.key ??= newKey(); // mesma chave em re-tentativas = sem pedido duplicado
   co.errors = {}; co.formError = ""; co.submitting = false;
   if (state.cep && !co.data.address.cep) co.data.address.cep = masks.cep(state.cep);
