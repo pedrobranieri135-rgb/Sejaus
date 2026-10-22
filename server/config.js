@@ -42,6 +42,8 @@ export function loadConfig(overrides = {}) {
       webhookSecret: env.MP_WEBHOOK_SECRET || null,
       maxInstallments: int(env.MP_MAX_INSTALLMENTS, 3),
     },
+    // endereço público do site (volta do Mercado Pago e webhook); sem ele, usa o endereço da requisição
+    siteUrl: (env.SITE_URL || "").replace(/\/+$/, "") || null,
     // só em teste: nome "APRO" faz o Pix de teste ser aprovado sozinho
     mpTestPayerName: env.MP_TEST_PAYER_NAME || null,
     freeShippingCents: int(env.FREE_SHIPPING_CENTS, 29900),

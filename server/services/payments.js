@@ -1,7 +1,7 @@
 // Pagamento online (Mercado Pago, API de Orders): cria a cobrança do pedido, sincroniza o status
 // (webhook, consulta do cliente na tela do Pix e rotina de expiração) e trata cancelamento/estorno.
 import { HttpError } from "../lib/errors.js";
-import { mpUnavailable, paymentState, rejectionMessage, summarize } from "../lib/mercadopago.js";
+import { mpUnavailable, paymentState, rejectionMessage, summarize, summarizePayment } from "../lib/mercadopago.js";
 import { expireStaleOrders, updateOrderStatus } from "./checkout.js";
 
 const firstName = (full) => String(full).trim().split(/\s+/)[0].slice(0, 40);
@@ -49,6 +49,26 @@ export async function startPayment(db, config, mp, order, input) {
     return { state: paymentState(sm) };
   }
 
+  if (input.payment === "cartao" && !input.card) {
+    // Checkout Pro: o cliente paga na página do Mercado Pago; a confirmação chega pelo webhook / consulta
+    let pref;
+    try {
+      pref = await mp.createCheckoutPreference({
+        code: order.code, totalCents: order.totalCents, payer, siteUrl: input.siteUrl,
+        maxInstallments: config.mercadopago?.maxInstallments ?? 3, expiresInHours: config.orderTtlHours,
+      });
+    } catch (err) {
+      console.error("[mercadopago] checkout pro:", err.status, JSON.stringify(err.body ?? err.message).slice(0, 300));
+      await db.run("UPDATE orders SET payment_provider = 'mercadopago', payment_status = 'erro', payment_detail = ? WHERE code = ?", [`checkout_indisponivel:${err.status}`, order.code]);
+      return { error: "Não conseguimos abrir o pagamento com cartão agora. Fale com a gente no WhatsApp para concluir." };
+    }
+    const row = await db.one("SELECT id FROM orders WHERE code = ?", [order.code]);
+    await db.run(`UPDATE orders SET payment_provider = 'mercadopago', payment_status = 'pendente', payment_detail = 'checkout_pro',
+        mp_preference_id = ?, mp_checkout_url = ?, updated_at = now() WHERE id = ?`, [pref.id, pref.init_point, row.id]);
+    await logEvent(db, row.id, "criacao", "checkout_pro", pref.id);
+    return { state: "pendente" };
+  }
+
   if (input.payment === "cartao") {
     const card = input.card;
     let mpOrder;
@@ -90,7 +110,16 @@ async function markPaid(db, config, code, sm, note) {
 }
 
 /** Busca a situação real no Mercado Pago e aplica no pedido. Fonte da verdade: a API, nunca o corpo do webhook. */
-export async function syncPayment(db, config, mp, { code, mpOrderId }, source = "consulta") {
+export async function syncPayment(db, config, mp, { code, mpOrderId, mpPaymentId }, source = "consulta") {
+  if (mpPaymentId) {
+    // webhook do tópico "payment" (Checkout Pro): descobre o pedido pelo external_reference do pagamento
+    const p = summarizePayment(await mp.getPayment(mpPaymentId));
+    return p.externalReference ? syncCheckoutPro(db, config, mp, p.externalReference, source) : null;
+  }
+  if (code) {
+    const pre = await db.one("SELECT mp_order_id, mp_preference_id FROM orders WHERE code = ?", [code]);
+    if (pre && !pre.mp_order_id && pre.mp_preference_id) return syncCheckoutPro(db, config, mp, code, source);
+  }
   const order = code
     ? await db.one("SELECT * FROM orders WHERE code = ?", [code])
     : await db.one("SELECT * FROM orders WHERE mp_order_id = ?", [mpOrderId]);
@@ -112,11 +141,34 @@ export async function syncPayment(db, config, mp, { code, mpOrderId }, source = 
   return { order: await db.one("SELECT * FROM orders WHERE id = ?", [local.id]), changed: before !== state };
 }
 
+/**
+ * Checkout Pro: o cliente pode tentar mais de um cartão na página do Mercado Pago.
+ * Vale o pagamento aprovado (se houver); recusas não cancelam o pedido, que segue aguardando até expirar.
+ */
+async function syncCheckoutPro(db, config, mp, code, source) {
+  const local = await db.one("SELECT * FROM orders WHERE code = ?", [code]);
+  if (!local?.mp_preference_id) return local ? { order: local, changed: false } : null;
+  const payments = (await mp.searchPayments(code)).map(summarizePayment).filter((p) => p.externalReference === code);
+  const pick = payments.find((p) => p.status === "processed") ?? payments.find((p) => p.status === "refunded") ?? payments[0];
+  if (!pick) {
+    await db.run("UPDATE orders SET payment_checked_at = now() WHERE id = ?", [local.id]);
+    return { order: local, changed: false };
+  }
+  let state = paymentState(pick);
+  if (state === "recusado" || state === "cancelado") state = "pendente"; // ainda pode pagar com outro cartão
+  const before = local.payment_status;
+  await saveSummary(db, local.id, pick, { state: before === "pago_apos_cancelamento" ? before : state });
+  await db.run("UPDATE orders SET payment_detail = ? WHERE id = ?", [pick.statusDetail ?? "checkout_pro", local.id]);
+  if (before !== state || pick.status === "failed") await logEvent(db, local.id, source, pick.status, pick.statusDetail);
+  if (state === "pago") await markPaid(db, config, code, pick, source === "webhook" ? "Cartão aprovado (Mercado Pago)" : "Cartão aprovado");
+  return { order: await db.one("SELECT * FROM orders WHERE id = ?", [local.id]), changed: before !== state };
+}
+
 /** Antes de expirar pedidos vencidos, confere no Mercado Pago (um Pix pago com webhook perdido não é cancelado). */
 export async function expireWithSync(db, config, mp) {
   if (mp) {
     const cutoff = new Date(Date.now() - config.orderTtlHours * 3600_000).toISOString();
-    const stale = await db.all("SELECT code FROM orders WHERE status = 'aguardando_pagamento' AND mp_order_id IS NOT NULL AND created_at < ? LIMIT 50", [cutoff]);
+    const stale = await db.all("SELECT code FROM orders WHERE status = 'aguardando_pagamento' AND (mp_order_id IS NOT NULL OR mp_preference_id IS NOT NULL) AND created_at < ? LIMIT 50", [cutoff]);
     for (const { code } of stale) {
       try {
         const r = await syncPayment(db, config, mp, { code }, "expiracao");
@@ -130,7 +182,7 @@ export async function expireWithSync(db, config, mp) {
 /** Pedidos aguardando que não tiveram retorno recente: confere em lote (painel aberto / cron). */
 export async function syncPending(db, config, mp, { limit = 20, olderThanSec = 60 } = {}) {
   if (!mp) return 0;
-  const rows = await db.all(`SELECT code FROM orders WHERE status = 'aguardando_pagamento' AND mp_order_id IS NOT NULL
+  const rows = await db.all(`SELECT code FROM orders WHERE status = 'aguardando_pagamento' AND (mp_order_id IS NOT NULL OR mp_preference_id IS NOT NULL)
     AND (payment_checked_at IS NULL OR payment_checked_at < now() - make_interval(secs => ?)) ORDER BY id DESC LIMIT ?`, [olderThanSec, limit]);
   let n = 0;
   for (const { code } of rows) {
@@ -142,19 +194,24 @@ export async function syncPending(db, config, mp, { limit = 20, olderThanSec = 6
 /** Cancelamento pelo painel: Pix pendente → cancela a cobrança; pagamento aprovado → estorna antes de cancelar. */
 export async function cancelWithPayment(db, config, mp, code) {
   const o = await db.one("SELECT * FROM orders WHERE code = ?", [code]);
-  if (!o || !mp || !o.mp_order_id) return { refunded: false };
+  if (!o || !mp || !(o.mp_order_id || o.mp_preference_id)) return { refunded: false };
   if (o.payment_status === "pago" || o.payment_status === "pago_apos_cancelamento") {
     try {
-      const r = await mp.refundOrder(o.mp_order_id);
-      const sm = summarize(r);
-      await saveSummary(db, o.id, sm, { state: "estornado" });
-      await logEvent(db, o.id, "estorno", sm.status, "estorno total pelo painel");
+      if (o.mp_order_id) {
+        const sm = summarize(await mp.refundOrder(o.mp_order_id));
+        await saveSummary(db, o.id, sm, { state: "estornado" });
+        await logEvent(db, o.id, "estorno", sm.status, "estorno total pelo painel");
+      } else {
+        await mp.refundPayment(o.mp_payment_id);
+        await db.run("UPDATE orders SET payment_status = 'estornado', payment_checked_at = now() WHERE id = ?", [o.id]);
+        await logEvent(db, o.id, "estorno", "refunded", "estorno total pelo painel");
+      }
       return { refunded: true };
     } catch (err) {
       console.error("[mercadopago] estorno:", err.status, JSON.stringify(err.body ?? err.message).slice(0, 300));
       throw new HttpError(502, "O Mercado Pago não confirmou o estorno. Nada foi cancelado; tente de novo ou estorne pelo app do Mercado Pago.");
     }
   }
-  if (o.payment_status === "pendente") await mp.cancelOrder(o.mp_order_id).catch(() => {});
+  if (o.payment_status === "pendente" && o.mp_order_id) await mp.cancelOrder(o.mp_order_id).catch(() => {});
   return { refunded: false };
 }

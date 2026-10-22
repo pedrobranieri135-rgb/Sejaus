@@ -92,7 +92,10 @@ function paymentInfo(config, order, items) {
     method: order.payment_method,
     whatsappUrl: `https://wa.me/${store.whatsapp}?text=${encodeURIComponent(summary)}`,
   };
-  if (order.payment_provider === "mercadopago" && order.pix_qr_code) {
+  if (order.payment_provider === "mercadopago" && order.mp_checkout_url) {
+    info.automatic = true;
+    info.checkoutUrl = order.mp_checkout_url; // página de pagamento com cartão do Mercado Pago
+  } else if (order.payment_provider === "mercadopago" && order.pix_qr_code) {
     // Pix do Mercado Pago: QR exclusivo do pedido, confirmado automaticamente
     info.automatic = true;
     info.pix = {

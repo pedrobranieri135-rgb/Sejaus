@@ -80,6 +80,31 @@ export function createMercadoPago({ accessToken, timeoutMs = 15_000 }) {
       });
     },
 
+    /** Cartão pelo Checkout Pro: o cliente é levado à página do Mercado Pago e volta ao site depois de pagar. */
+    createCheckoutPreference({ code, totalCents, payer, siteUrl, maxInstallments, expiresInHours }) {
+      const back = `${siteUrl}/?pedido=${encodeURIComponent(code)}`;
+      const https = siteUrl.startsWith("https://");
+      return call("POST", "/checkout/preferences", {
+        body: {
+          items: [{ id: code, title: `Pedido ${code} - Seja US`, quantity: 1, unit_price: Number(money(totalCents)), currency_id: "BRL" }],
+          payer: { email: payer.email, name: payer.firstName },
+          external_reference: code,
+          back_urls: { success: back, pending: back, failure: back },
+          ...(https ? { auto_return: "approved", notification_url: `${siteUrl}/api/webhooks/mercadopago` } : {}),
+          payment_methods: {
+            excluded_payment_types: [{ id: "ticket" }, { id: "bank_transfer" }, { id: "atm" }, { id: "debit_card" }],
+            installments: maxInstallments,
+          },
+          statement_descriptor: "SEJA US",
+          expires: true,
+          expiration_date_to: new Date(Date.now() + Math.max(expiresInHours, 1) * 3600_000).toISOString(),
+        },
+      });
+    },
+    getPayment: (id) => call("GET", `/v1/payments/${encodeURIComponent(id)}`),
+    /** Pagamentos feitos para um pedido (Checkout Pro), mais recentes primeiro. */
+    searchPayments: (code) => call("GET", `/v1/payments/search?sort=date_created&criteria=desc&limit=20&external_reference=${encodeURIComponent(code)}`).then((r) => r.results ?? []),
+    refundPayment: (id) => call("POST", `/v1/payments/${encodeURIComponent(id)}/refunds`, { body: {}, idempotencyKey: `refund-p-${id}` }),
     getOrder: (id) => call("GET", `/v1/orders/${encodeURIComponent(id)}`),
     /** A credencial é de conta de teste? (consulta 1x por instância) */
     isTestAccount() {
@@ -107,6 +132,25 @@ export function summarize(mpOrder) {
     pix: pm.qr_code ? { qrCode: pm.qr_code, qrCodeBase64: pm.qr_code_base64, ticketUrl: pm.ticket_url } : null,
     method: pm.id ?? null,
     installments: pm.installments ?? null,
+  };
+}
+
+/** Lê um pagamento (API de Payments / Checkout Pro) no mesmo formato de summarize(). */
+const PAYMENT_STATUS = { approved: "processed", rejected: "failed", cancelled: "canceled", refunded: "refunded", charged_back: "refunded" };
+export function summarizePayment(p) {
+  const status = PAYMENT_STATUS[p?.status] ?? "processing";
+  return {
+    mpOrderId: null,
+    mpPaymentId: p?.id != null ? String(p.id) : null,
+    status,
+    statusDetail: p?.status_detail ?? null,
+    paymentStatusDetail: p?.status_detail ?? null,
+    externalReference: p?.external_reference ?? null,
+    paidCents: status === "processed" ? Math.round(Number(p?.transaction_amount ?? 0) * 100) : 0,
+    totalCents: Math.round(Number(p?.transaction_amount ?? 0) * 100),
+    pix: null,
+    method: p?.payment_method_id ?? null,
+    installments: p?.installments ?? null,
   };
 }
 

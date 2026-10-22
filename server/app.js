@@ -120,14 +120,15 @@ export function createApp({ db, config, mp = createMercadoPago({ accessToken: co
     if (key && !/^[A-Za-z0-9-]{16,64}$/.test(key)) throw new HttpError(400, "Idempotency-Key inválida");
     const input = orderSchema.parse(req.body ?? {});
     const c = await cfg();
-    if (input.payment === "cartao" && mp && !input.card) throw new HttpError(400, "Preencha os dados do cartão", { field: "card" });
     if (input.card && input.card.installments > config.mercadopago.maxInstallments) {
       throw new HttpError(400, `Parcelamento em até ${config.mercadopago.maxInstallments}x`, { field: "card" });
     }
     const { order, replay } = await createOrder(db, c, input, key);
     let payment = null;
-    if (!replay && mp && (input.payment === "pix" || (input.payment === "cartao" && input.card))) {
-      payment = await startPayment(db, c, mp, order, input); // cartão recusado → 402 e pedido cancelado (estoque devolvido)
+    if (!replay && mp && (input.payment === "pix" || input.payment === "cartao")) {
+      const proto = String(req.get("x-forwarded-proto") || req.protocol).split(",")[0].trim();
+      const siteUrl = config.siteUrl || `${proto}://${req.get("host")}`;
+      payment = await startPayment(db, c, mp, order, { ...input, siteUrl }); // cartão recusado → 402 e pedido cancelado (estoque devolvido)
     }
     const fresh = await db.one("SELECT * FROM orders WHERE code = ?", [order.code]);
     const out = await serializeOrder(db, c, fresh, { withPayment: true });
@@ -141,9 +142,9 @@ export function createApp({ db, config, mp = createMercadoPago({ accessToken: co
     const { code, email } = trackSchema.parse(req.body ?? {});
     const c = await cfg();
     let o = await trackOrder(db, c, code, email);
-    const row = await db.one("SELECT status, payment_status, payment_checked_at, mp_order_id FROM orders WHERE code = ?", [code]);
+    const row = await db.one("SELECT status, payment_status, payment_checked_at, mp_order_id, mp_preference_id FROM orders WHERE code = ?", [code]);
     const stale = !row.payment_checked_at || Date.now() - Date.parse(row.payment_checked_at) > 4000;
-    if (mp && row.mp_order_id && row.status === "aguardando_pagamento" && stale) {
+    if (mp && (row.mp_order_id || row.mp_preference_id) && row.status === "aguardando_pagamento" && stale) {
       try { await syncPayment(db, c, mp, { code }, "consulta"); o = await trackOrder(db, c, code, email); }
       catch (err) { console.error("[pagamento] consulta:", err.message); }
     }
@@ -162,9 +163,10 @@ export function createApp({ db, config, mp = createMercadoPago({ accessToken: co
       console.warn("[webhook] assinatura inválida ou ausente", { type, dataId: dataId.slice(0, 40) });
       return res.status(401).json({ error: "Assinatura inválida" });
     }
-    if (type !== "order" || !/^[A-Za-z0-9]{6,64}$/.test(dataId)) return res.status(200).json({ ok: true, ignored: true });
+    const isPayment = type === "payment" && /^\d{4,24}$/.test(dataId);
+    if (!isPayment && (type !== "order" || !/^[A-Za-z0-9]{6,64}$/.test(dataId))) return res.status(200).json({ ok: true, ignored: true });
     try {
-      await syncPayment(db, await cfg(), mp, { mpOrderId: dataId }, "webhook");
+      await syncPayment(db, await cfg(), mp, isPayment ? { mpPaymentId: dataId } : { mpOrderId: dataId }, "webhook");
     } catch (err) {
       console.error("[webhook] sync falhou:", err.message);
       return res.status(500).json({ error: "Tente novamente" }); // o Mercado Pago reenvia

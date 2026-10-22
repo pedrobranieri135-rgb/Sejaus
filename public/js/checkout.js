@@ -1,6 +1,5 @@
 import { $, $$, api, ApiError, brl, esc, isValidCpf, masks, newKey, onlyDigits, store, toast } from "./lib.js";
 import { closeCart, openCart, refreshQuote, state } from "./app.js";
-import { mountCardBrick, unmountCardBrick } from "./mp.js";
 
 const online = () => !!state.meta?.payments?.online;
 let pollTimer = null;
@@ -117,12 +116,11 @@ function stepHTML() {
     </div>`;
   }
   const maxInst = state.meta?.payments?.maxInstallments ?? 3;
-  const cardOnline = online() && d.payment === "cartao";
   return `<div class="choice-list" role="radiogroup" aria-label="Forma de pagamento">
       <label class="choice"><input type="radio" name="payment" value="pix" ${d.payment === "pix" ? "checked" : ""}>
         <span><b>Pix</b><span>${online() ? "QR Code na tela. O pagamento é confirmado automaticamente em segundos." : "Código copia e cola na hora."}</span></span></label>
       <label class="choice"><input type="radio" name="payment" value="cartao" ${d.payment === "cartao" ? "checked" : ""}>
-        <span><b>Cartão de crédito em até ${maxInst}x</b><span>${online() ? "Pagamento seguro processado pelo Mercado Pago, aqui mesmo no site." : "Você recebe um link de pagamento seguro no WhatsApp."}</span></span></label>
+        <span><b>Cartão de crédito em até ${maxInst}x</b><span>${online() ? "Ao confirmar, você vai para a página segura do Mercado Pago." : "Você recebe um link de pagamento seguro no WhatsApp."}</span></span></label>
       <label class="choice"><input type="radio" name="payment" value="whatsapp" ${d.payment === "whatsapp" ? "checked" : ""}>
         <span><b>Combinar pelo WhatsApp</b><span>Fale com a equipe US para tirar dúvidas antes de pagar.</span></span></label>
     </div>
@@ -130,9 +128,9 @@ function stepHTML() {
       <div><b>Entrega para</b> ${esc(d.customer.name)}<br>${esc(d.address.street)}, ${esc(d.address.number)}${d.address.complement ? ` — ${esc(d.address.complement)}` : ""}, ${esc(d.address.district)}, ${esc(d.address.city)}/${esc(d.address.state)}, ${esc(masks.cep(d.address.cep))}</div>
       <button class="linklike" type="button" data-goto="2">Alterar endereço</button>
     </div>
-    ${cardOnline ? `<div class="card-brick-wrap"><div id="card-brick" class="card-brick" aria-live="polite"><p class="muted">Carregando pagamento seguro…</p></div>
-      <p class="secure-note">🔒 Os dados do cartão vão direto para o Mercado Pago. A Seja US não vê nem guarda o número do seu cartão.</p></div>`
-      : `<p class="muted">${d.payment === "pix" && online() ? "Ao confirmar, o QR Code do Pix aparece na tela." : "Seu pedido fica reservado por 48 horas aguardando o pagamento."}</p>`}`;
+    <p class="muted">${d.payment === "pix" && online() ? "Ao confirmar, o QR Code do Pix aparece na tela."
+      : d.payment === "cartao" && online() ? "🔒 Ao clicar em Confirmar pedido, você é levado ao Mercado Pago para pagar com cartão. A Seja US não vê nem guarda os dados do seu cartão."
+      : "Seu pedido fica reservado por 48 horas aguardando o pagamento."}</p>`;
 }
 
 function render() {
@@ -147,8 +145,8 @@ function render() {
       ${stepHTML()}
       <div class="co-nav">
         ${co.step > 1 ? `<button class="btn btn-ghost" type="button" data-back>Voltar</button>` : `<span></span>`}
-        <button class="btn btn-dark" type="submit" ${co.submitting || blockedByIssues ? "disabled" : ""} ${co.step === 3 && online() && co.data.payment === "cartao" ? "hidden" : ""}>
-          ${co.submitting ? `<span class="spinner" aria-hidden="true"></span> Enviando pedido` : co.step < 3 ? "Continuar" : "Confirmar pedido"}
+        <button class="btn btn-dark" type="submit" ${co.submitting || blockedByIssues ? "disabled" : ""}>
+          ${co.submitting ? `<span class="spinner" aria-hidden="true"></span> ${co.redirecting ? "Abrindo o Mercado Pago" : "Enviando pedido"}` : co.step < 3 ? "Continuar" : "Confirmar pedido"}
         </button>
       </div>
     </form>
@@ -156,28 +154,6 @@ function render() {
   </div>`;
   const firstInvalid = $(".field.invalid input, .field.invalid select", body());
   if (firstInvalid) firstInvalid.focus();
-  if (co.step === 3 && online() && co.data.payment === "cartao" && !co.submitting) mountCard();
-  else unmountCardBrick();
-}
-
-function mountCard() {
-  const d = co.data;
-  mountCardBrick("card-brick", {
-    publicKey: state.meta.payments.publicKey,
-    amountCents: currentTotalCents(),
-    email: d.customer.email,
-    cpf: onlyDigits(d.customer.cpf),
-    maxInstallments: state.meta.payments.maxInstallments ?? 3,
-    onReady: () => $("#card-brick > .muted")?.remove(),
-    onSubmit: (card) => submit(card),
-    onError: (err) => {
-      console.warn("[cartão]", err);
-      if (err?.type === "critical") { co.formError = "O pagamento com cartão não carregou. Recarregue a página ou pague com Pix."; render(); }
-    },
-  }).catch((err) => {
-    const box = $("#card-brick");
-    if (box) box.innerHTML = `<p class="form-error">${esc(err.message)}</p>`;
-  });
 }
 
 function pixAutoHTML(order) {
@@ -205,7 +181,7 @@ function startPolling(order) {
       if (r.status === "cancelado") {
         stopPolling();
         const box = $("#pix-auto");
-        if (box) box.innerHTML = `<b>Este Pix expirou</b><span class="muted">Faça um novo pedido ou fale com a gente no WhatsApp.</span>`;
+        if (box) box.innerHTML = `<b>${order.paymentMethod === "pix" ? "Este Pix expirou" : "Este pedido expirou"}</b><span class="muted">Faça um novo pedido ou fale com a gente no WhatsApp.</span>`;
       }
     } catch { /* rede oscilou: tenta de novo no próximo ciclo */ }
   }, 4000);
@@ -226,7 +202,8 @@ function renderDone(order) {
   const p = order.payment;
   const paid = order.status === "pago";
   const pixAuto = p?.automatic && p?.pix && !paid;
-  const cardPending = order.paymentMethod === "cartao" && order.paymentProvider === "mercadopago" && !paid;
+  const cardRedirect = p?.checkoutUrl && !paid;
+  const cardPending = order.paymentMethod === "cartao" && order.paymentProvider === "mercadopago" && !paid && !cardRedirect;
   body().innerHTML = `
   <button class="icon-btn modal-close" data-close aria-label="Fechar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   <div class="done-view">
@@ -239,6 +216,13 @@ function renderDone(order) {
     <p>Total: <b>${brl(order.totalCents)}</b></p>
     ${order.paymentError ? `<p class="form-error">${esc(order.paymentError)}</p>` : ""}
     ${pixAuto ? pixAutoHTML(order) : ""}
+    ${cardRedirect ? `
+      <div class="pix-box pix-auto" id="pix-auto">
+        <b>Pagamento com cartão</b>
+        <p class="pix-wait" role="status"><span class="spinner" aria-hidden="true"></span> Confirmando com o Mercado Pago. Esta tela atualiza sozinha.</p>
+        <span class="muted">Ainda não pagou ou o cartão foi recusado? Você pode tentar de novo.</span>
+        <a class="btn btn-dark" href="${esc(p.checkoutUrl)}">Pagar no Mercado Pago</a>
+      </div>` : ""}
     ${p?.pix && !p.automatic ? `
       <div class="pix-box">
         <b>Pague com Pix copia e cola</b>
@@ -252,7 +236,7 @@ function renderDone(order) {
       <a class="btn btn-ghost" href="#rastreio" data-track="${esc(order.code)}" data-email="${esc(order.customer.email)}">Acompanhar pedido</a>
     </div>
   </div>`;
-  if (pixAuto) startPolling(order);
+  if (pixAuto || cardRedirect) startPolling(order);
 }
 
 /* ---------- ações ---------- */
@@ -302,7 +286,8 @@ async function lookupCep(cep) {
 
 async function submit(card) {
   co.submitting = true; co.formError = ""; co.couponRejected = false;
-  if (!card) render(); // no cartão o próprio botão "Pagar" do formulário mostra o carregamento
+  co.redirecting = online() && co.data.payment === "cartao";
+  render();
   const d = co.data;
   try {
     const order = await api("/orders", {
@@ -318,15 +303,20 @@ async function submit(card) {
         coupon: state.coupon || undefined,
       },
     });
-    await unmountCardBrick();
     // sucesso: limpa sacola e gera nova chave para o próximo pedido
     state.cart = []; store.set("us.cart", []);
     state.coupon = ""; store.set("us.coupon", "");
     co.key = null; co.step = 1;
     await refreshQuote();
+    if (order.payment?.checkoutUrl && order.status === "aguardando_pagamento") {
+      // cartão: paga na página do Mercado Pago e volta para /?pedido=CODIGO
+      store.set("us.pending", { code: order.code, email: order.customer.email });
+      location.assign(order.payment.checkoutUrl);
+      return;
+    }
     renderDone(order);
   } catch (err) {
-    co.submitting = false;
+    co.submitting = false; co.redirecting = false;
     if (err instanceof ApiError && err.status === 402) {
       // cartão recusado: o pedido foi cancelado (estoque devolvido); nova tentativa = nova chave
       co.key = newKey();
@@ -373,7 +363,7 @@ export async function openCheckout() {
 
 function init() {
   const m = dlg();
-  m.addEventListener("close", () => { stopPolling(); unmountCardBrick(); });
+  m.addEventListener("close", () => stopPolling());
   m.addEventListener("input", (e) => {
     const el = e.target;
     if (el.dataset.mask) el.value = masks[el.dataset.mask](el.value);
@@ -424,4 +414,21 @@ function init() {
   });
 }
 
+/** Volta do Mercado Pago (/?pedido=CODIGO): mostra o pedido e acompanha a confirmação do pagamento. */
+async function resumeFromMercadoPago() {
+  const code = new URLSearchParams(location.search).get("pedido");
+  if (!code) return;
+  history.replaceState(null, "", location.pathname + location.hash);
+  const pending = store.get("us.pending", null);
+  if (!pending || pending.code !== code) return;
+  try {
+    await api("/orders/payment-status", { method: "POST", body: pending }).catch(() => {});
+    const order = await api("/orders/track", { method: "POST", body: pending });
+    if (order.status !== "aguardando_pagamento") store.set("us.pending", null);
+    renderDone(order);
+    if (!dlg().open) dlg().showModal();
+  } catch { /* pedido não encontrado: segue para a loja */ }
+}
+
 init();
+resumeFromMercadoPago();

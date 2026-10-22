@@ -91,6 +91,19 @@ describe("pagamento automático (Mercado Pago, ambiente de teste)", { skip }, ()
     assert.equal(paid.paymentStatus, "pago");
   });
 
+  test("cartão sem dados: cria o pedido e devolve o link do Mercado Pago (Checkout Pro)", async () => {
+    const s = await skuWith(1);
+    const r = await call("POST", "/api/orders", { items: [{ sku: s.id, qty: 1 }], customer, address, shipping: "padrao", payment: "cartao" }, { "Idempotency-Key": crypto.randomUUID() });
+    assert.equal(r.status, 201, r.text);
+    assert.equal(r.json.status, "aguardando_pagamento");
+    assert.match(r.json.payment.checkoutUrl, /^https:\/\/www\.mercadopago\.com\.br\/checkout\/v1\/redirect\?pref_id=/);
+    // ainda sem pagamento: a consulta não muda nada nem cancela o pedido
+    const st = await call("POST", "/api/orders/payment-status", { code: r.json.code, email: customer.email });
+    assert.equal(st.status, 200, st.text);
+    assert.equal(st.json.status, "aguardando_pagamento");
+    assert.equal(st.json.paymentStatus, "pendente");
+  });
+
   test("cartão aprovado: pedido nasce pago, com parcelas", async () => {
     const s = await skuWith(2);
     const r = await call("POST", "/api/orders", { items: [{ sku: s.id, qty: 1 }], customer, address, shipping: "padrao", payment: "cartao", card: await card("APRO", 3) }, { "Idempotency-Key": crypto.randomUUID() });

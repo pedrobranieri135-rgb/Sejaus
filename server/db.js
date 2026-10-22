@@ -266,6 +266,11 @@ const MIGRATIONS = [
     );
     ALTER TABLE payment_events ENABLE ROW LEVEL SECURITY;
   `],
+  ["004_checkout_pro", (s) => `
+    SET LOCAL search_path TO "${s}", public;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_preference_id TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_checkout_url TEXT;
+  `],
 ];
 
 // Tudo o que as migrações criam pertence ao usuário da loja (loja_app), mesmo quando quem roda é o
