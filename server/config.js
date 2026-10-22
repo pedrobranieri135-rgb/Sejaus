@@ -35,6 +35,15 @@ export function loadConfig(overrides = {}) {
       pixMerchantName: env.PIX_MERCHANT_NAME || "SEJA US",
       pixMerchantCity: env.PIX_MERCHANT_CITY || "SAO PAULO",
     },
+    // Mercado Pago (pagamento automático). Sem MP_ACCESS_TOKEN, a loja usa Pix estático + WhatsApp.
+    mercadopago: {
+      accessToken: env.MP_ACCESS_TOKEN || null,
+      publicKey: env.MP_PUBLIC_KEY || null,
+      webhookSecret: env.MP_WEBHOOK_SECRET || null,
+      maxInstallments: int(env.MP_MAX_INSTALLMENTS, 3),
+    },
+    // só em teste: nome "APRO" faz o Pix de teste ser aprovado sozinho
+    mpTestPayerName: env.MP_TEST_PAYER_NAME || null,
     freeShippingCents: int(env.FREE_SHIPPING_CENTS, 29900),
     orderTtlHours: int(env.ORDER_TTL_HOURS, 48),
     maxQtyPerItem: 10,

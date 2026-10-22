@@ -50,7 +50,7 @@ export const NEXT = {
   aguardando_pagamento: ["pago", "cancelado"], pago: ["em_separacao", "cancelado"],
   em_separacao: ["enviado", "cancelado"], enviado: ["entregue"], entregue: [], cancelado: [],
 };
-export const PAYMENT = { pix: "Pix", cartao: "Cartão (link)", whatsapp: "WhatsApp" };
+export const PAYMENT = { pix: "Pix", cartao: "Cartão", whatsapp: "WhatsApp" };
 export const SHIPPING = { padrao: "Padrão", expresso: "Expressa" };
 export const LINE = { adapt: "US Adapt", essential: "US Essential" };
 

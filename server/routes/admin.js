@@ -14,7 +14,7 @@ import {
   adminGetProduct, adminListProducts, bulkPrice, deleteProduct, saveProduct, saveUpload, setProductActive,
 } from "../services/products-admin.js";
 import { customers, dashboard, report } from "../services/reports.js";
-import { sweepThrottled } from "../services/checkout.js";
+import { cancelWithPayment, expireWithSync, syncPending } from "../services/payments.js";
 import { effectiveConfig, getSettings, saveSettings } from "../services/settings.js";
 
 function readCookie(req, name) {
@@ -32,7 +32,9 @@ const id = (v) => {
   return n;
 };
 
-export function adminRouter({ db, config, limiter }) {
+let lastAdminSweep = 0;
+
+export function adminRouter({ db, config, limiter, mp }) {
   const r = express.Router();
   const json = express.json({ limit: "200kb" });
   const secure = config.env === "production";
@@ -93,7 +95,16 @@ export function adminRouter({ db, config, limiter }) {
 
   // ---- painel ----
   // abrir o painel também expira pedidos vencidos (na Vercel não há rotina rodando o tempo todo)
-  const sweep = async () => sweepThrottled(db, (await cfg()).orderTtlHours);
+  // abrir o painel confere pagamentos pendentes no Mercado Pago e expira pedidos vencidos (no máx. a cada 2 min)
+  const sweep = async () => {
+    if (Date.now() - lastAdminSweep < 2 * 60_000) return;
+    lastAdminSweep = Date.now();
+    try {
+      const c = await cfg();
+      await syncPending(db, c, mp, { limit: 15 });
+      await expireWithSync(db, c, mp);
+    } catch (err) { console.error("[painel] sincronização:", err.message); }
+  };
   r.get("/dashboard", async (req, res) => { await sweep(); res.json(await dashboard(db)); });
   r.get("/summary", async (req, res) => res.json(await dashboard(db))); // compatibilidade
 
@@ -106,7 +117,11 @@ export function adminRouter({ db, config, limiter }) {
   r.get("/orders/:code", async (req, res) => res.json(await getOrderAdmin(db, await cfg(), String(req.params.code).toUpperCase())));
   const statusHandler = async (req, res) => {
     const code = String(req.params.code).toUpperCase();
+    // cancelar pedido pago pelo Mercado Pago estorna o cliente antes (se o estorno falhar, nada é cancelado)
+    let refund = null;
+    if (req.body?.status === "cancelado") refund = await cancelWithPayment(db, await cfg(), mp, code);
     const out = await changeStatus(db, await cfg(), code, req.body ?? {});
+    if (refund?.refunded) out.refunded = true;
     await log(req, "status_pedido", `${code} → ${out.status}`);
     res.json(out);
   };

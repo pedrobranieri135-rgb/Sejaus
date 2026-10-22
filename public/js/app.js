@@ -156,7 +156,7 @@ function cardHTML(p) {
     <div class="card-info">
       <span class="card-line">${esc(LINE_LABEL[p.line])}</span>
       <button class="card-name" type="button" data-open="${esc(p.slug)}">${esc(p.name)}</button>
-      <span class="price">${p.compareAtCents ? `<s>${brl(p.compareAtCents)}</s> ` : ""}${brl(p.priceCents)}<small>ou 3x de ${brl(p.installments.valueCents)}</small></span>
+      <span class="price">${p.compareAtCents ? `<s>${brl(p.compareAtCents)}</s> ` : ""}${brl(p.priceCents)}<small>até 3x no cartão</small></span>
       <div class="swatches" role="group" aria-label="Cores">
         ${p.variants.map((c, i) => `<button class="swatch" type="button" style="--sw:${esc(c.hex)}" data-swatch="${i}" aria-pressed="${i === vi}" aria-label="${esc(c.color)}" title="${esc(c.color)}"></button>`).join("")}
       </div>
@@ -306,7 +306,7 @@ function renderProduct() {
         <p class="card-line">${esc(LINE_LABEL[p.line])} / ${esc(p.categoryLabel)}</p>
         <h2 id="pm-title">${esc(p.name)}</h2>
       </div>
-      <p class="pm-price">${p.compareAtCents ? `<s>${brl(p.compareAtCents)}</s> <span class="tag tag-dark">${offPct(p)}% OFF</span><br>` : ""}${brl(p.priceCents)}<small>ou 3x de ${brl(p.installments.valueCents)} sem juros</small></p>
+      <p class="pm-price">${p.compareAtCents ? `<s>${brl(p.compareAtCents)}</s> <span class="tag tag-dark">${offPct(p)}% OFF</span><br>` : ""}${brl(p.priceCents)}<small>ou em até 3x no cartão</small></p>
       <div>
         <div class="opt-head"><span>Cor: <b>${esc(v.color)}</b></span></div>
         <div class="swatches" role="group" aria-label="Cores">
@@ -629,7 +629,8 @@ function renderTrack(o) {
     <p><b>${esc(o.code)}</b> — ${esc(STATUS[o.status])} <span class="muted">/ ${brl(o.totalCents)}</span></p>
     <ul class="timeline">${steps.map((s) => `<li class="${at.has(s) ? "" : "todo"}">${esc(STATUS[s])}${at.has(s) ? `<time datetime="${esc(at.get(s))}">${date(at.get(s))}</time>` : ""}</li>`).join("")}</ul>
     ${o.tracking ? `<div class="pix-box"><b>Código de rastreio: ${esc(o.tracking.code)}</b><a class="btn btn-dark" href="${esc(o.tracking.url)}" target="_blank" rel="noopener">Rastrear entrega</a></div>` : ""}
-    ${o.payment?.pix ? `<p class="muted">Pagamento pendente. Pix copia e cola:</p><div class="pix-box"><code>${esc(o.payment.pix.copyPaste)}</code><button class="btn btn-dark" type="button" data-copy="${esc(o.payment.pix.copyPaste)}">Copiar código Pix</button></div>` : ""}`;
+    ${o.payment?.pix ? `<p class="muted">Pagamento pendente.${o.payment.automatic ? " Pague com o QR Code abaixo; a confirmação é automática." : " Pix copia e cola:"}</p><div class="pix-box${o.payment.automatic ? " pix-auto" : ""}">${o.payment.automatic && o.payment.pix.qrBase64 ? `<img class="pix-qr" src="data:image/png;base64,${esc(o.payment.pix.qrBase64)}" alt="QR Code do Pix" width="220" height="220">` : ""}<code>${esc(o.payment.pix.copyPaste)}</code><button class="btn btn-dark" type="button" data-copy="${esc(o.payment.pix.copyPaste)}">Copiar código Pix</button></div>` : ""}
+    ${o.paymentStatus === "pago" ? `<p class="paid-msg">Pagamento confirmado${o.installments > 1 ? ` (cartão em ${o.installments}x)` : ""}.</p>` : ""}`;
 }
 
 function initForms() {

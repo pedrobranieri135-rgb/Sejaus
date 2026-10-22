@@ -8,7 +8,9 @@ import { HttpError, notFound } from "./lib/errors.js";
 import { formatZodError, newsletterSchema, orderSchema, quoteSchema, trackSchema } from "./lib/validators.js";
 import { adminRouter } from "./routes/admin.js";
 import { getMeta, getProduct, listProducts } from "./services/catalog.js";
-import { createOrder, expireStaleOrders, quote, trackOrder } from "./services/checkout.js";
+import { createOrder, quote, serializeOrder, trackOrder } from "./services/checkout.js";
+import { createMercadoPago, verifyWebhookSignature } from "./lib/mercadopago.js";
+import { expireWithSync, startPayment, syncPayment, syncPending } from "./services/payments.js";
 import { storagePublicBase } from "./lib/images.js";
 import { effectiveConfig } from "./services/settings.js";
 
@@ -20,7 +22,7 @@ const limiter = (enabled, windowMin, max) =>
       })
     : (req, res, next) => next();
 
-export function createApp({ db, config }) {
+export function createApp({ db, config, mp = createMercadoPago({ accessToken: config.mercadopago?.accessToken }) }) {
   const app = express();
   const rl = config.rateLimit !== false;
   app.disable("x-powered-by");
@@ -31,11 +33,14 @@ export function createApp({ db, config }) {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", ...(storagePublicBase() ? [new URL(storagePublicBase()).origin] : [])],
-        connectSrc: ["'self'", "https://viacep.com.br"],
+        // scripts embutidos seguem bloqueados (o SDK do Mercado Pago tenta injetar um de sincronização de cookies;
+        // o pagamento funciona sem ele e liberar "unsafe-inline" enfraqueceria a proteção contra XSS)
+        scriptSrc: ["'self'", "https://sdk.mercadopago.com", "https://http2.mlstatic.com", "https://www.mercadopago.com", "https://www.mercadolibre.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://http2.mlstatic.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "https://http2.mlstatic.com"],
+        imgSrc: ["'self'", "data:", ...(storagePublicBase() ? [new URL(storagePublicBase()).origin] : []), "https://*.mlstatic.com", "https://*.mercadopago.com", "https://*.mercadolibre.com"],
+        connectSrc: ["'self'", "https://viacep.com.br", "https://api.mercadopago.com", "https://api.mercadolibre.com", "https://*.mercadopago.com", "https://*.mercadolibre.com", "https://*.mlstatic.com"],
+        frameSrc: ["https://*.mercadopago.com", "https://*.mercadopago.com.br", "https://*.mercadolibre.com", "https://*.mercadolivre.com"],
         frameAncestors: ["'none'"],
         formAction: ["'self'"],
         objectSrc: ["'none'"],
@@ -51,7 +56,7 @@ export function createApp({ db, config }) {
   const api = express.Router();
   api.use((req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
   // painel tem parser e limites próprios (payload de produto e upload de foto são maiores)
-  api.use("/admin", adminRouter({ db, config, limiter: (w, m) => limiter(rl, w, m) }));
+  api.use("/admin", adminRouter({ db, config, mp, limiter: (w, m) => limiter(rl, w, m) }));
   api.use(express.json({ limit: "20kb", strict: true }));
   api.use(limiter(rl, 15, 600));
   const cfg = () => effectiveConfig(db, config);
@@ -67,8 +72,10 @@ export function createApp({ db, config }) {
     const secret = process.env.CRON_SECRET;
     const got = req.get("Authorization") || "";
     if (!secret || got !== `Bearer ${secret}`) return res.status(401).json({ error: "Não autorizado" });
-    const n = await expireStaleOrders(db, (await cfg()).orderTtlHours);
-    res.json({ ok: true, expired: n });
+    const c = await cfg();
+    const synced = await syncPending(db, c, mp, { limit: 50, olderThanSec: 0 });
+    const n = await expireWithSync(db, c, mp);
+    res.json({ ok: true, expired: n, synced });
   });
 
   api.get("/meta", async (req, res) => {
@@ -78,6 +85,10 @@ export function createApp({ db, config }) {
       store: { name: config.store.name, instagram: config.store.instagram, whatsapp: c.store.whatsapp },
       freeShippingCents: c.freeShippingCents,
       announcement: c.announcement,
+      // a Public Key é pública por natureza (vai para o navegador); o Access Token nunca sai do servidor
+      payments: mp && config.mercadopago.publicKey
+        ? { online: true, provider: "mercadopago", publicKey: config.mercadopago.publicKey, maxInstallments: config.mercadopago.maxInstallments }
+        : { online: false },
     });
   });
 
@@ -108,8 +119,57 @@ export function createApp({ db, config }) {
     const key = req.get("Idempotency-Key");
     if (key && !/^[A-Za-z0-9-]{16,64}$/.test(key)) throw new HttpError(400, "Idempotency-Key inválida");
     const input = orderSchema.parse(req.body ?? {});
-    const { order, replay } = await createOrder(db, await cfg(), input, key);
-    res.status(replay ? 200 : 201).json(order);
+    const c = await cfg();
+    if (input.payment === "cartao" && mp && !input.card) throw new HttpError(400, "Preencha os dados do cartão", { field: "card" });
+    if (input.card && input.card.installments > config.mercadopago.maxInstallments) {
+      throw new HttpError(400, `Parcelamento em até ${config.mercadopago.maxInstallments}x`, { field: "card" });
+    }
+    const { order, replay } = await createOrder(db, c, input, key);
+    let payment = null;
+    if (!replay && mp && (input.payment === "pix" || (input.payment === "cartao" && input.card))) {
+      payment = await startPayment(db, c, mp, order, input); // cartão recusado → 402 e pedido cancelado (estoque devolvido)
+    }
+    const fresh = await db.one("SELECT * FROM orders WHERE code = ?", [order.code]);
+    const out = await serializeOrder(db, c, fresh, { withPayment: true });
+    if (payment?.error) out.paymentError = payment.error;
+    res.status(replay ? 200 : 201).json(out);
+  });
+
+  // Tela do Pix: o navegador do cliente pergunta "já pagou?" a cada poucos segundos.
+  // Confere no Mercado Pago no máximo 1x a cada 4 s por pedido (o webhook normalmente chega antes).
+  api.post("/orders/payment-status", limiter(rl, 15, 400), async (req, res) => {
+    const { code, email } = trackSchema.parse(req.body ?? {});
+    const c = await cfg();
+    let o = await trackOrder(db, c, code, email);
+    const row = await db.one("SELECT status, payment_status, payment_checked_at, mp_order_id FROM orders WHERE code = ?", [code]);
+    const stale = !row.payment_checked_at || Date.now() - Date.parse(row.payment_checked_at) > 4000;
+    if (mp && row.mp_order_id && row.status === "aguardando_pagamento" && stale) {
+      try { await syncPayment(db, c, mp, { code }, "consulta"); o = await trackOrder(db, c, code, email); }
+      catch (err) { console.error("[pagamento] consulta:", err.message); }
+    }
+    res.json({ code: o.code, status: o.status, paymentStatus: o.paymentStatus, paymentDetail: o.paymentDetail });
+  });
+
+  // Avisos automáticos do Mercado Pago (tópico "Order"). Só confia no que a própria API confirmar.
+  api.post("/webhooks/mercadopago", async (req, res) => {
+    const dataId = String(req.query["data.id"] ?? req.body?.data?.id ?? "");
+    const type = String(req.query.type ?? req.body?.type ?? "");
+    if (!mp) return res.status(503).json({ error: "Pagamento online desativado" });
+    const valid = verifyWebhookSignature({
+      xSignature: req.get("x-signature"), xRequestId: req.get("x-request-id"), dataId, secret: config.mercadopago.webhookSecret,
+    });
+    if (!valid) {
+      console.warn("[webhook] assinatura inválida ou ausente", { type, dataId: dataId.slice(0, 40) });
+      return res.status(401).json({ error: "Assinatura inválida" });
+    }
+    if (type !== "order" || !/^[A-Za-z0-9]{6,64}$/.test(dataId)) return res.status(200).json({ ok: true, ignored: true });
+    try {
+      await syncPayment(db, await cfg(), mp, { mpOrderId: dataId }, "webhook");
+    } catch (err) {
+      console.error("[webhook] sync falhou:", err.message);
+      return res.status(500).json({ error: "Tente novamente" }); // o Mercado Pago reenvia
+    }
+    res.status(200).json({ ok: true });
   });
 
   api.post("/orders/track", limiter(rl, 15, 30), async (req, res) => {

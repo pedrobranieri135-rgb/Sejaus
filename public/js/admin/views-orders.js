@@ -5,6 +5,9 @@ import {
 } from "./core.js";
 
 /* =================== PAINEL =================== */
+const MP_LABEL = { pago: "Pago", pendente: "Aguardando", recusado: "Recusado", cancelado: "Cancelado", estornado: "Estornado", erro: "Erro ao gerar", pago_apos_cancelamento: "Pago após cancelar" };
+const MP_PILL = { pago: "pago", pendente: "aguardando_pagamento", recusado: "cancelado", cancelado: "cancelado", estornado: "inativo", erro: "cancelado", pago_apos_cancelamento: "cancelado" };
+
 export async function dashboardView() {
   frame("Painel", `<a class="btn btn-dark btn-sm" href="#/produtos/novo">Novo produto</a>`);
   loading();
@@ -145,12 +148,16 @@ function renderOrder() {
     </section>` : ""}
 
     <section class="card-box"><div class="box-head"><h2>Itens</h2><button class="btn btn-ghost btn-sm" data-print>Imprimir guia de separação</button></div>
+      ${o.mercadopago?.status === "pago_apos_cancelamento" ? `<p class="form-error" style="margin-bottom:12px">Este cliente pagou depois que o pedido expirou. Devolva o valor pelo app do Mercado Pago ou fale com o cliente para refazer a compra.</p>` : ""}
       ${o.items.map((i) => `<div class="item-line"><img src="${esc(i.image)}" alt=""><span><b>${i.qty}x ${esc(i.name)}</b><br><span class="muted">${esc(i.color)} / ${esc(i.size)} · ${brl(i.unitPriceCents)}</span></span><b>${brl(i.lineTotalCents)}</b></div>`).join("")}
       <dl class="kv" style="margin-top:12px">
         <dt>Subtotal</dt><dd>${brl(o.subtotalCents)}</dd>
         ${o.discountCents ? `<dt>Desconto</dt><dd>− ${brl(o.discountCents)} (${esc(o.couponCode)})</dd>` : o.couponCode ? `<dt>Cupom</dt><dd>${esc(o.couponCode)}</dd>` : ""}
         <dt>Frete</dt><dd>${o.shippingCents ? brl(o.shippingCents) : "Grátis"} · ${esc(SHIPPING[o.shippingMethod] || o.shippingMethod)}</dd>
         <dt><b>Total</b></dt><dd><b>${brl(o.totalCents)}</b> · ${esc(PAYMENT[o.paymentMethod] || o.paymentMethod)}</dd>
+        ${o.mercadopago ? `<dt>Mercado Pago</dt><dd>${pill(MP_PILL[o.mercadopago.status] || "inativo", MP_LABEL[o.mercadopago.status] || o.mercadopago.status || "—")}
+          ${o.mercadopago.installments > 1 ? ` · ${o.mercadopago.installments}x` : ""}${o.mercadopago.brand ? ` · ${esc(o.mercadopago.brand)}` : ""}
+          ${o.mercadopago.paidCents ? ` · recebido ${brl(o.mercadopago.paidCents)}` : ""}<br><span class="muted">ID ${esc(o.mercadopago.orderId)}</span></dd>` : ""}
       </dl>
     </section>
 
@@ -211,7 +218,10 @@ function bindOrderPanel() {
     const to = e.target.closest("[data-to]");
     if (to) {
       const status = to.dataset.to;
-      if (status === "cancelado" && !(await confirmBox(`Cancelar o pedido ${current.code}? As peças voltam para o estoque.`, { confirm: "Cancelar pedido", danger: true }))) return;
+      const paidOnline = current.mercadopago && current.mercadopago.status === "pago";
+      if (status === "cancelado" && !(await confirmBox(paidOnline
+        ? `Cancelar o pedido ${current.code}? O valor de ${brl(current.mercadopago.paidCents || current.totalCents)} será ESTORNADO ao cliente pelo Mercado Pago e as peças voltam para o estoque.`
+        : `Cancelar o pedido ${current.code}? As peças voltam para o estoque.`, { confirm: paidOnline ? "Cancelar e estornar" : "Cancelar pedido", danger: true }))) return;
       const trackingCode = status === "enviado" ? $("#ship-code", body)?.value.trim() : "";
       if (status === "enviado" && !trackingCode && !(await confirmBox("Marcar como enviado sem código de rastreio? (ex.: entrega em mãos ou motoboy)", { confirm: "Enviar sem rastreio" }))) return;
       to.disabled = true;

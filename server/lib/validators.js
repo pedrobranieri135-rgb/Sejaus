@@ -55,6 +55,15 @@ export const orderSchema = z.object({
   }).strict(),
   shipping: z.enum(["padrao", "expresso"], { errorMap: () => ({ message: "Escolha a forma de entrega" }) }),
   payment: z.enum(["pix", "cartao", "whatsapp"], { errorMap: () => ({ message: "Escolha a forma de pagamento" }) }),
+  // cartão: só o token gerado pelo formulário do Mercado Pago (número/CVV nunca chegam aqui)
+  card: z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{16,80}$/, "Cartão inválido"),
+    paymentMethodId: z.string().regex(/^[a-z_]{2,30}$/),
+    type: z.enum(["credit_card", "debit_card"]).default("credit_card"),
+    installments: z.coerce.number().int().min(1).max(12),
+    issuerId: z.union([z.string(), z.number()]).optional(),
+    identification: z.object({ type: z.string().max(10), number: z.string().regex(/^\d{11,14}$/) }).strict().optional(),
+  }).strict().optional(),
   coupon: couponSchema.optional().or(z.literal("").transform(() => undefined)),
 }).strict();
 

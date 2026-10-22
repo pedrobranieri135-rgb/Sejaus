@@ -529,3 +529,15 @@ svg { flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Pagamento online (Mercado Pago) ---------- */
+.card-brick-wrap { display: grid; gap: 10px; }
+.card-brick { min-height: 120px; border: 1px solid var(--line); border-radius: 14px; padding: 6px; background: #fff; }
+.card-brick > .muted { padding: 18px; }
+.secure-note { font-size: .78rem; color: var(--taupe); }
+.pix-auto { justify-items: center; text-align: center; }
+.pix-qr { width: 220px; height: 220px; image-rendering: pixelated; background: #fff; padding: 8px; border-radius: 12px; }
+.pix-wait { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: .875rem; color: var(--ink); }
+.pix-wait .spinner { width: 14px; height: 14px; border-width: 2px; color: var(--ice-deep); }
+.paid-msg { color: var(--ok); font-weight: 600; }
+.done-sub { max-width: 52ch; }

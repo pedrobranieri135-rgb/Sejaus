@@ -13,7 +13,7 @@ npm run dev            # loja: http://localhost:3000   painel: http://localhost:
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | servidor com recarga automática |
-| `npm test` | 48 testes (estoque, pedidos concorrentes, cupons, painel, migrações, Storage) contra o Postgres |
+| `npm test` | 57 testes (estoque, pedidos concorrentes, cupons, painel, migrações, Storage, Mercado Pago) contra o Postgres |
 | `npm run demo` | cria ~30 pedidos de demonstração (e-mails @exemplo.com) para ver o painel com números |
 | `npm run seed` | recria o catálogo original e **apaga todos os pedidos** |
 
@@ -38,6 +38,22 @@ Como roda:
 - Banco pelo **pooler do Supabase em modo transação** (porta 6543) com o usuário `loja_app`, que só enxerga o schema `loja`.
 - Cron diário (`/api/cron/expire-orders`, protegido por `CRON_SECRET`) expira pedidos não pagos; abrir o painel também faz isso.
 - Fotos enviadas pelo painel são reduzidas no navegador (limite de 4,5 MB por requisição da Vercel) e vão para o Supabase Storage.
+
+## Pagamento automático (Mercado Pago)
+Integração pela **API de Orders** (Checkout Transparente): o cliente paga sem sair do site.
+- **Pix:** QR Code exclusivo do pedido; a tela confirma sozinha quando o pagamento cai.
+- **Cartão:** formulário oficial do Mercado Pago (Card Payment Brick) dentro do checkout, até `MP_MAX_INSTALLMENTS` parcelas. Os dados do cartão vão direto para o Mercado Pago; a loja só recebe um token.
+- **Confirmação:** webhook `/api/webhooks/mercadopago` (tópico "Order", assinatura `x-signature` validada) + consulta na tela do Pix + verificação ao abrir o painel e no cron. A situação sempre é conferida na API do Mercado Pago.
+- **Recusa de cartão:** o pedido é cancelado na hora e o estoque volta; o cliente vê o motivo e tenta de novo.
+- **Cancelar no painel um pedido pago:** estorna o valor pelo Mercado Pago antes de cancelar.
+- **O dinheiro cai na conta dona das credenciais.** Em produção, use as credenciais da conta Mercado Pago do dono da loja.
+
+| Variável | O quê |
+|---|---|
+| `MP_PUBLIC_KEY` / `MP_ACCESS_TOKEN` | Suas integrações → aplicação → Credenciais (teste ou produção) |
+| `MP_WEBHOOK_SECRET` | Suas integrações → aplicação → Webhooks → assinatura secreta |
+| `MP_MAX_INSTALLMENTS` | parcelas máximas no cartão (padrão 3) |
+| `MP_TEST_PAYER_NAME` | só para teste: `APRO` faz o Pix de teste ser aprovado sozinho (ignorado com credencial de produção) |
 
 ## Antes de publicar
 - Trocar `ADMIN_PASSWORD` (ou a senha pelo painel) e definir `NODE_ENV=production` (ativa cookie Secure)

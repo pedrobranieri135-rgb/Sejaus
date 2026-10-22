@@ -261,7 +261,7 @@ describe("migração", { skip: !hasDatabase && skipReason }, () => {
     await migrate(db);
     await migrate(db);
     const applied = await db.all("SELECT name FROM schema_migrations ORDER BY name");
-    assert.deepEqual(applied.map((r) => r.name), ["001_inicial", "002_bloqueio_api_publica"]);
+    assert.deepEqual(applied.map((r) => r.name), ["001_inicial", "002_bloqueio_api_publica", "003_pagamento_mercadopago"]);
     const noRls = await db.all("SELECT tablename FROM pg_tables WHERE schemaname = ? AND NOT rowsecurity", [db.schema]);
     assert.deepEqual(noRls, [], "todas as tabelas com RLS ligado");
     const anon = await db.one("SELECT has_schema_privilege('anon', ?, 'USAGE') AS ok", [db.schema]).catch(() => ({ ok: false }));

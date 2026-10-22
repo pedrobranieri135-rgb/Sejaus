@@ -63,6 +63,11 @@ export async function getOrderAdmin(db, config, code) {
     address: JSON.parse(o.address),
     internalNote: o.internal_note || "",
     previousOrders: (await db.one("SELECT COUNT(*) AS n FROM orders WHERE email = ? AND id != ? AND status != 'cancelado'", [o.email, o.id])).n,
+    mercadopago: o.mp_order_id ? {
+      orderId: o.mp_order_id, paymentId: o.mp_payment_id, status: o.payment_status, detail: o.payment_detail,
+      paidCents: o.paid_cents, installments: o.installments, brand: o.card_brand, checkedAt: o.payment_checked_at,
+      events: await db.all("SELECT source, mp_status, detail, at FROM payment_events WHERE order_id = ? ORDER BY id", [o.id]),
+    } : null,
   };
 }
 

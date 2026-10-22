@@ -18,7 +18,15 @@ const routes = {
 
 let lastSection = null;
 
-async function route() {
+// Navegação em fila: uma tela só começa depois que a anterior terminou de carregar.
+// Sem isso, uma tela lenta (ex.: Painel) podia terminar de desenhar por cima da tela seguinte.
+let routing = Promise.resolve();
+function route() {
+  routing = routing.then(renderRoute, renderRoute);
+  return routing;
+}
+
+async function renderRoute() {
   if (!state.me) return;
   const [path, query = ""] = location.hash.replace(/^#\/?/, "").split("?");
   const [section = "painel", ...rest] = path.split("/").filter(Boolean);

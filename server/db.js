@@ -238,17 +238,58 @@ const MIGRATIONS = [
       END IF;
     END $$;
   `],
+  // Pagamento online pelo Mercado Pago (API de Orders): Pix com QR do pedido e cartão
+  ["003_pagamento_mercadopago", (s) => `
+    SET LOCAL search_path TO "${s}", public;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_provider TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_detail TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_order_id TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_payment_id TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_cents INTEGER;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS installments INTEGER;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_brand TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS pix_qr_code TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS pix_qr_base64 TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS pix_ticket_url TEXT;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS pix_expires_at TIMESTAMPTZ;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_checked_at TIMESTAMPTZ;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_mp_order ON orders(mp_order_id) WHERE mp_order_id IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS payment_events (
+      id          SERIAL PRIMARY KEY,
+      order_id    INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+      source      TEXT NOT NULL,
+      mp_status   TEXT,
+      detail      TEXT,
+      at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    ALTER TABLE payment_events ENABLE ROW LEVEL SECURITY;
+  `],
 ];
+
+// Tudo o que as migrações criam pertence ao usuário da loja (loja_app), mesmo quando quem roda é o
+// administrador do banco. Senão a loja na Vercel (que conecta como loja_app) não conseguiria gravar.
+const ACT_AS_APP_ROLE = `DO $$ BEGIN
+  IF current_user <> 'loja_app' AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'loja_app')
+     AND pg_has_role(current_user, 'loja_app', 'MEMBER') THEN
+    EXECUTE 'SET LOCAL ROLE loja_app';
+  END IF;
+END $$;`;
 
 export async function migrate(db) {
   const s = db.schema;
-  await db.exec(`CREATE SCHEMA IF NOT EXISTS "${s}"`);
-  await db.exec(`CREATE TABLE IF NOT EXISTS "${s}".schema_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
-  await db.exec(`ALTER TABLE "${s}".schema_migrations ENABLE ROW LEVEL SECURITY`);
+  await db.tx(async (t) => {
+    await t.exec(ACT_AS_APP_ROLE);
+    await t.exec(`CREATE SCHEMA IF NOT EXISTS "${s}"`);
+    await t.exec(`CREATE TABLE IF NOT EXISTS "${s}".schema_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+    await t.exec(`ALTER TABLE "${s}".schema_migrations ENABLE ROW LEVEL SECURITY`);
+  });
   const done = new Set((await db.all(`SELECT name FROM "${s}".schema_migrations`)).map((r) => r.name));
   for (const [name, sql] of MIGRATIONS) {
     if (done.has(name)) continue;
     await db.tx(async (t) => {
+      await t.exec(ACT_AS_APP_ROLE);
       // trava para duas instâncias subindo juntas não aplicarem a mesma migração
       await t.exec(`SELECT pg_advisory_xact_lock(hashtext('${s}.migrations'))`);
       if (await t.one(`SELECT 1 FROM "${s}".schema_migrations WHERE name = ?`, [name])) return;

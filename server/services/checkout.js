@@ -92,7 +92,17 @@ function paymentInfo(config, order, items) {
     method: order.payment_method,
     whatsappUrl: `https://wa.me/${store.whatsapp}?text=${encodeURIComponent(summary)}`,
   };
-  if (order.payment_method === "pix") {
+  if (order.payment_provider === "mercadopago" && order.pix_qr_code) {
+    // Pix do Mercado Pago: QR exclusivo do pedido, confirmado automaticamente
+    info.automatic = true;
+    info.pix = {
+      copyPaste: order.pix_qr_code,
+      qrBase64: order.pix_qr_base64,
+      ticketUrl: order.pix_ticket_url,
+      expiresAt: order.pix_expires_at,
+      expiresInHours: config.orderTtlHours,
+    };
+  } else if (order.payment_method === "pix" && order.payment_provider !== "mercadopago") {
     info.pix = {
       key: store.pixKey,
       copyPaste: pixPayload({
@@ -128,6 +138,12 @@ export async function serializeOrder(db, config, order, { withPayment = false } 
     totalCents: order.total_cents,
     couponCode: order.coupon_code,
     paymentMethod: order.payment_method,
+    paymentProvider: order.payment_provider ?? null,
+    paymentStatus: order.payment_status ?? null,
+    paymentDetail: order.payment_detail ?? null,
+    installments: order.installments ?? null,
+    cardBrand: order.card_brand ?? null,
+    paidAt: order.paid_at ?? null,
     tracking: order.tracking_code
       ? { code: order.tracking_code, carrier: order.carrier, url: trackingUrl(order.tracking_code), shippedAt: order.shipped_at }
       : null,
